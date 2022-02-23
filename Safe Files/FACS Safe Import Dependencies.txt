@@ -1,0 +1,19 @@
+##v1
+#Assets/FACS Safe Import/Editor/SafeImport.cs
+2fec1e52b10921ca7c6b8dd6335001b194ad1922cbecb5013674c577de84ef8a
+#Assets/FACS Safe Import/Editor/Managed/ICSharpCode.SharpZipLib.dll
+c287e9b07a8251828f35914364c89a37db606b0c1d64457f9eb8fa2258f0dee3
+#Assets/FACS Safe Import/Editor/Managed/Microsoft.Bcl.AsyncInterfaces.dll
+295af2142d9214f3fd84eafe4778dca119be7e0229f14b6ba8d5269c2f1e2e78
+#Assets/FACS Safe Import/Editor/Managed/System.Buffers.dll
+accccfbe45d9f08ffeed9916e37b33e98c65be012cfff6e7fa7b67210ce1fefb
+#Assets/FACS Safe Import/Editor/Managed/System.Memory.dll
+8e76318e8b06692abf7dab1169d27d15557f7f0a34d36af6463eff0fe21213c7
+#Assets/FACS Safe Import/Editor/Managed/System.Runtime.CompilerServices.Unsafe.dll
+37768488e8ef45729bc7d9a2677633c6450042975bb96516e186da6cb9cd0dcf
+#Assets/FACS Safe Import/Editor/Managed/System.Text.Encodings.Web.dll
+78eb5b4fee580e163d1bea1fdb7d371fdfcfd30acd8708ff62c4372aaa219f7c
+#Assets/FACS Safe Import/Editor/Managed/System.Text.Json.dll
+e51ab157565c648ccdf3b003937fe991abdd1a03e53a7e58ba1f6505097cb082
+#Assets/FACS Safe Import/Editor/Managed/System.Threading.Tasks.Extensions.dll
+4f81ffd0dc7204db75afc35ea4291769b07c440592f28894260eea76626a23c6
