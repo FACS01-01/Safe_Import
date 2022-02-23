@@ -1,6 +1,6 @@
 ##v1
 #Assets/FACS Safe Import/Editor/SafeImport.cs
-ae42db7c3dcf0d641b79eaa4878f6afb94e0f6dbfea174f9d67d4806dc8ebc1c
+1d045210272cd8283a8bac1cd04348bb534a69abfbb64387187a2054aed5cbbb
 #Assets/FACS Safe Import/Editor/Managed/ICSharpCode.SharpZipLib.dll
 c287e9b07a8251828f35914364c89a37db606b0c1d64457f9eb8fa2258f0dee3
 #Assets/FACS Safe Import/Editor/Managed/Microsoft.Bcl.AsyncInterfaces.dll
