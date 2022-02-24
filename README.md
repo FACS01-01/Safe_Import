@@ -5,6 +5,9 @@
 
 Unity script that protects you from running malicious scripts on import
 
+## Donations
+If you like my tool and want to support me, i have a [Buy Me a Coffee](https://www.buymeacoffee.com/FACS01) page.
+
 ## Thanks to / Using
 [icsharpcode/SharpZipLib](https://github.com/icsharpcode/SharpZipLib), used for zip file creation.
 
