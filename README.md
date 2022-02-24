@@ -5,6 +5,10 @@
 
 Unity script that protects you from running malicious scripts on import
 
-## Thanks to
+## Thanks to / Using
 [icsharpcode/SharpZipLib](https://github.com/icsharpcode/SharpZipLib), used for zip file creation.
+
 [JamesNK/Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json), used for reading GitHub API in json.
+
+## Featured Compatible Databases
+[LargestBoi/LargestSecurityRepo](https://github.com/LargestBoi/LargestSecurityRepo)
