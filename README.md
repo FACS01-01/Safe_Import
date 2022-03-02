@@ -14,4 +14,6 @@ If you like my tool and want to support me, I have a [Buy Me a Coffee](https://w
 [JamesNK/Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json), used for reading GitHub API in json.
 
 ## Featured Compatible Databases
+[Purple420/Hashes-of-Safe-Scripts](https://github.com/Purple420/Hashes-of-Safe-Scripts)
+
 [LargestBoi/LargestSecurityRepo](https://github.com/LargestBoi/LargestSecurityRepo)
