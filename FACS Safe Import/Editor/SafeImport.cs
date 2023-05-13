@@ -28,18 +28,12 @@ namespace FACSSafeImport
             {
                 string[] ScriptPaths = CSPaths.Concat(DLLPaths).Select(p=>p.Replace(@"\", @"/")).ToArray();
 
-                if (SafeImport.badFiles == null || SafeImport.safeFiles == null)
-                {
-                    SafeImport.ReloadDatabase();
-                }
+                if (SafeImport.badFiles == null || SafeImport.safeFiles == null) SafeImport.ReloadDatabase();
                 List<string> unknownFiles = new List<string>();
                 foreach (string file in ScriptPaths)
                 {
                     string fileHash = DetectScriptChanges.SHA256CheckSum(file);
-                    if (!SafeImport.badFiles.Contains(fileHash) && !SafeImport.safeFiles.Contains(fileHash))
-                    {
-                        unknownFiles.Add(file);
-                    }
+                    if (!SafeImport.badFiles.Contains(fileHash) && !SafeImport.safeFiles.Contains(fileHash)) unknownFiles.Add(file);
                 }
 
                 if (unknownFiles.Count>0)
@@ -77,8 +71,7 @@ namespace FACSSafeImport
                 Debug.LogWarning($"[<color=cyan>FACS Safe Import</color>] There are no scripts to zip in this project.\n");
             }
         }
-
-        private static void CompressDirectory(string DirectoryPath, string OutputFilePath)
+        private static void CompressDirectory(string DirectoryPath, string OutputFilePath, int CompressionLevel = 9)
         {
             try
             {
@@ -98,45 +91,31 @@ namespace FACSSafeImport
         public static string SafeImport_Bad = MainFolder + "/Unsafe Files";
 
         private static int ticks = 0;
-        public static string[] safeFiles;
-        public static string[] badFiles;
+        public static HashSet<string> safeFiles = new HashSet<string>();
+        public static HashSet<string> badFiles = new HashSet<string>();
 
         public static void OnUpdate() // workaround for bug in EditorApplication.LockReloadAssemblies. Updates assets edited outside Unity
         {
-            if (ticks < 500)
-            {
-                ticks++;
-            }
+            if (ticks < 500) ticks++;
             else
             {
                 ticks = 0;
                 AssetDatabase.Refresh();
             }
         }
-
         public static void DownloadOnlineSourcesOnStartup()
         {
-            if (!Directory.Exists(SafeImport.MainFolder))
-            {
-                Directory.CreateDirectory(SafeImport.MainFolder);
-            }
+            if (!Directory.Exists(SafeImport.MainFolder)) Directory.CreateDirectory(SafeImport.MainFolder);
             if (!File.Exists(OnlineSources.Sources_file))
             {
-                using (StreamWriter sw = File.CreateText(OnlineSources.Sources_file))
-                {
-                    sw.WriteLine("FACS01-01/Safe_Import");
-                }
+                using (StreamWriter sw = File.CreateText(OnlineSources.Sources_file)) sw.WriteLine("FACS01-01/Safe_Import");
             }
             List<string> sources_list = new List<string>();
             var lines = File.ReadLines(OnlineSources.Sources_file);
-            foreach (var line in lines)
-            {
-                sources_list.Add(line);
-            }
+            foreach (var line in lines) sources_list.Add(line);
             if (sources_list.Count > 0)
             {
                 OnlineSources.GetGitHubContent(sources_list);
-                EditorUtility.ClearProgressBar();
             }
         }
 
@@ -165,8 +144,7 @@ namespace FACSSafeImport
         [MenuItem("FACS Safe Import/Start Safe Mode", true, 6)]
         public static bool CanStartSafeMode()
         {
-            if (PlayerPrefs.GetInt("FACSSafeImport_SafeMode", 0) == 0)
-                return true;
+            if (PlayerPrefs.GetInt("FACSSafeImport_SafeMode", 0) == 0) return true;
             return false;
         }
 
@@ -183,8 +161,7 @@ namespace FACSSafeImport
         [MenuItem("FACS Safe Import/Exit Safe Mode", true, 7)]
         public static bool CanExitSafeMode()
         {
-            if (PlayerPrefs.GetInt("FACSSafeImport_SafeMode", 0) == 1)
-                return true;
+            if (PlayerPrefs.GetInt("FACSSafeImport_SafeMode", 0) == 1) return true;
             return false;
         }
 
@@ -200,14 +177,10 @@ namespace FACSSafeImport
         [MenuItem("FACS Safe Import/Force Reload Scripts", false, 8)]
         public static void ReloadScripts()
         {
-            if (!EditorUtility.DisplayDialog($"FACS Safe Import - Force Reload Scripts", $"You are about to allow all scripts currently in your project, safe and unsafe, to compile and run.\nDo you want to proceed?", "Yes", "No"))
-            {
-                return;
-            }
-            if (PlayerPrefs.GetInt("FACSSafeImport_SafeMode", 0) == 0)
-            {
-                CompilationPipeline.RequestScriptCompilation();
-            }
+            if (!EditorUtility.DisplayDialog($"FACS Safe Import - Force Reload Scripts",
+                $"You are about to allow all scripts currently in your project, safe and unsafe, to compile and run.\n" +
+                $"Do you want to proceed?", "Yes", "No")) return;
+            if (PlayerPrefs.GetInt("FACSSafeImport_SafeMode", 0) == 0) CompilationPipeline.RequestScriptCompilation();
             else
             {
                 EditorApplication.UnlockReloadAssemblies();
@@ -216,7 +189,6 @@ namespace FACSSafeImport
             }
             Debug.Log($"[<color=cyan>FACS Safe Import</color>] Reloading scripts...\n");
         }
-
         public static void OnAfterAssemblyReload()
         {
             AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
@@ -227,30 +199,23 @@ namespace FACSSafeImport
         [MenuItem("FACS Safe Import/Database/Reload Local Database", false, 2)]
         public static void ReloadDatabase()
         {
-            if (!Directory.Exists(SafeImport_Safe))
-                Directory.CreateDirectory(SafeImport_Safe);
+            safeFiles.Clear(); badFiles.Clear();
+            if (!Directory.Exists(SafeImport_Safe)) Directory.CreateDirectory(SafeImport_Safe);
+            if (!Directory.Exists(SafeImport_Bad)) Directory.CreateDirectory(SafeImport_Bad);
 
-            if (!Directory.Exists(SafeImport_Bad))
-                Directory.CreateDirectory(SafeImport_Bad);
+            var SafePaths = Directory.GetFiles(SafeImport_Safe, "*.txt", SearchOption.AllDirectories).Select(f=> f.Replace(@"\","/"));
+            var UnsafePaths = Directory.GetFiles(SafeImport_Bad, "*.txt", SearchOption.AllDirectories).Select(f => f.Replace(@"\", "/"));
 
-            string[] SafePaths = Directory.GetFiles(SafeImport_Safe, "*.txt", SearchOption.AllDirectories);
-            string[] UnsafePaths = Directory.GetFiles(SafeImport_Bad, "*.txt", SearchOption.AllDirectories);
-
-            List<string> safepathslist = new List<string>();
-            foreach (string f in SafePaths)
+            foreach (string file in SafePaths)
             {
-                string file = f.Replace("\\", "/");
                 var lines = File.ReadLines(file);
                 foreach (var line in lines)
                 {
                     if (line.StartsWith("#") || String.IsNullOrWhiteSpace(line)) continue;
-                    string line2 = line.Trim();
-                    if (!safepathslist.Contains(line2)) safepathslist.Add(line2);
+                    safeFiles.Add(line.Trim());
                 }
             }
-            safeFiles = safepathslist.ToArray();
 
-            List<string> unsafepathslist = new List<string>();
             foreach (string f in UnsafePaths)
             {
                 string file = f.Replace("\\", "/");
@@ -258,24 +223,18 @@ namespace FACSSafeImport
                 foreach (var line in lines)
                 {
                     if (line.StartsWith("#") || String.IsNullOrWhiteSpace(line)) continue;
-                    string line2 = line.Trim();
-                    if (!unsafepathslist.Contains(line2)) unsafepathslist.Add(line2);
+                    badFiles.Add(line.Trim());
                 }
             }
-            badFiles = unsafepathslist.ToArray();
 
-            Debug.Log($"[<color=cyan>FACS Safe Import</color>] Database loaded with {safeFiles.Length} safe hashes and {badFiles.Length} unsafe hashes.\n");
+            Debug.Log($"[<color=cyan>FACS Safe Import</color>] Database loaded with {safeFiles.Count} safe hashes and {badFiles.Count} unsafe hashes.\n");
         }
 
         [MenuItem("FACS Safe Import/Database/Open Database Folder", false, 3)]
         public static void OpenDatabaseFolder()
         {
-            if (!Directory.Exists(SafeImport_Safe))
-                Directory.CreateDirectory(SafeImport_Safe);
-
-            if (!Directory.Exists(SafeImport_Bad))
-                Directory.CreateDirectory(SafeImport_Bad);
-
+            if (!Directory.Exists(SafeImport_Safe)) Directory.CreateDirectory(SafeImport_Safe);
+            if (!Directory.Exists(SafeImport_Bad)) Directory.CreateDirectory(SafeImport_Bad);
             EditorUtility.RevealInFinder(SafeImport_Safe);
         }
     }
@@ -302,23 +261,19 @@ namespace FACSSafeImport
         public static void ShowWindow()
         {
             LoadSources();
-            if (FacsGUIStyles == null) { FacsGUIStyles = new FACSGUIStyles(); }
+            if (FacsGUIStyles == null) FacsGUIStyles = new FACSGUIStyles();
             FacsGUIStyles.helpbox.alignment = TextAnchor.MiddleCenter;
             FacsGUIStyles.button.alignment = TextAnchor.MiddleCenter;
             if (newsource == null) newsource = "{user}/{repo}";
             GetWindow(typeof(OnlineSources), false, "Safe Import Sources", true);
         }
-
         public static int IsValidGitHubSource(string gitname)
         {
             string url = "https://api.github.com/repos/" + gitname + "/contents";
             string json;
             try
             {
-                using (MyWebClient wc = new MyWebClient())
-                {
-                    json = wc.DownloadString(new Uri(url));
-                }
+                using (MyWebClient wc = new MyWebClient()) json = wc.DownloadString(new Uri(url));
             }
             catch (WebException e)
             {
@@ -336,166 +291,25 @@ namespace FACSSafeImport
             {
                 if (cont.type == "dir")
                 {
-                    if (cont.name == "Safe Files")
-                    {
-                        output++;
-                    }
-                    else if (cont.name == "Unsafe Files")
-                    {
-                        output++;
-                    }
+                    if (cont.name == "Safe Files") output++;
+                    else if (cont.name == "Unsafe Files") output++;
                 }
             }
             return output;
         }
-
-        public static void GetGitHubContent(List<string> onlinesources)
+        public static (string, List<(string, string)>, List<(string, string)>) GetGitHubSafeUnsafeLinks(string gitname)
         {
-            int sourcescount = onlinesources.Count;
-            //gitname,safe(cont.name,cont.download_url),unsafe(cont.name,cont.download_url)
-            List<(string, List<(string, string)>, List<(string, string)>)> todownload = new List<(string, List<(string, string)>, List<(string, string)>)>();
-            int downloadCount = 0;
-            for (int i = 0; i < sourcescount; i++)
-            {
-                var isValidGitHubSource = IsValidGitHubSource(onlinesources[i]);
-                if (isValidGitHubSource == 3)
-                {
-                    string gitname = onlinesources[i]; string json; GitHub_content[] contents;
-                    List<(string, string)> safes = new List<(string, string)>();
-                    List<(string, string)> unsafes = new List<(string, string)>();
-
-                    string safeurl = $"https://api.github.com/repos/{gitname}/contents/Safe%20Files";
-                    try
-                    {
-                        using (MyWebClient wc = new MyWebClient())
-                        {
-                            json = wc.DownloadString(new Uri(safeurl));
-                        }
-                        contents = JsonConvert.DeserializeObject<GitHub_content[]>(json);
-                        foreach (var cont in contents)
-                        {
-                            if (cont.type == "file" && cont.name.EndsWith(".txt"))
-                            {
-                                safes.Add((cont.name, cont.download_url));
-                            }
-                        }
-                    }
-                    catch (WebException e)
-                    {
-                        Debug.LogError($"An error occurred while fetching Github page {gitname} (Safe Files). Internet down? Webpage down?\n" + e.Message);
-                    }
-                    catch (NotSupportedException e)
-                    {
-                        Debug.LogError($"A Not Supported Exception occurred while fetching Github page {gitname} (Safe Files).\n" + e.Message);
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogError($"An Exception occurred while processing Github page {gitname} (Safe Files).\n" + e.Message);
-                    }
-                    
-                    string unsafeurl = $"https://api.github.com/repos/{gitname}/contents/Unsafe%20Files";
-                    try
-                    {
-                        using (MyWebClient wc = new MyWebClient())
-                        {
-                            json = wc.DownloadString(new Uri(unsafeurl));
-                        }
-                        contents = JsonConvert.DeserializeObject<GitHub_content[]>(json);
-                        foreach (var cont in contents)
-                        {
-                            if (cont.type == "file" && cont.name.EndsWith(".txt"))
-                            {
-                                unsafes.Add((cont.name, cont.download_url));
-                            }
-                        }
-                    }
-                    catch (WebException e)
-                    {
-                        Debug.LogError($"An error occurred while fetching Github page {gitname} (Unsafe Files). Internet down? Webpage down?\n" + e.Message);
-                    }
-                    catch (NotSupportedException e)
-                    {
-                        Debug.LogError($"A Not Supported Exception occurred while fetching Github page {gitname} (Unsafe Files).\n" + e.Message);
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogError($"An Exception occurred while processing Github page {gitname} (Unsafe Files).\n" + e.Message);
-                    }
-
-                    if (safes.Count>0 || unsafes.Count>0)
-                    {
-                        downloadCount += (safes.Count + unsafes.Count);
-                        todownload.Add((gitname, safes, unsafes));
-                    }
-                }
-            }
-            float index = 0;
-            foreach (var d in todownload)
-            {
-                string gitname = d.Item1;
-                string safefolder = SafeImport.SafeImport_Safe + "/" + gitname.Replace("/", " ");
-                string unsafefolder = SafeImport.SafeImport_Bad + "/" + gitname.Replace("/", " ");
-                if (Directory.Exists(safefolder)) Directory.Delete(safefolder, true);
-                Directory.CreateDirectory(safefolder);
-                if (Directory.Exists(unsafefolder)) Directory.Delete(unsafefolder, true);
-                Directory.CreateDirectory(unsafefolder);
-
-                foreach (var dd in d.Item2)
-                {
-                    EditorUtility.DisplayProgressBar("FACS Safe Import - Downloading Online Databases", $"From {gitname}, Safe Hashes, {dd.Item1}", index / downloadCount);
-                    try
-                    {
-                        using (MyWebClient wc = new MyWebClient())
-                        {
-                            wc.DownloadFile(dd.Item2, safefolder + "/" + dd.Item1);
-                        }
-                    }
-                    catch
-                    {
-                        Debug.LogError($"Failed to download Safe Hashes from GitHub {gitname}, {dd.Item1}\n");
-                    }
-                    index++;
-                }
-                foreach (var dd in d.Item3)
-                {
-                    EditorUtility.DisplayProgressBar("FACS Safe Import - Downloading Online Databases", $"From {gitname}, Unsafe Hashes, {dd.Item1}", index / downloadCount);
-                    try
-                    {
-                        using (MyWebClient wc = new MyWebClient())
-                        {
-                            wc.DownloadFile(dd.Item2, unsafefolder + "/" + dd.Item1);
-                        }
-                    }
-                    catch
-                    {
-                        Debug.LogError($"Failed to download Unsafe Hashes from GitHub {gitname}, {dd.Item1}\n");
-                    }
-                    index++;
-                }
-            }
-        }
-
-        public static void DownloadGitHubContent_Single(string gitname)
-        {
-            //safe(cont.name,cont.download_url)
             string json; GitHub_content[] contents;
             List<(string, string)> safes = new List<(string, string)>();
             List<(string, string)> unsafes = new List<(string, string)>();
-
             string safeurl = $"https://api.github.com/repos/{gitname}/contents/Safe%20Files";
             try
             {
-                using (MyWebClient wc = new MyWebClient())
-                {
-                    json = wc.DownloadString(new Uri(safeurl));
-                }
+                using (MyWebClient wc = new MyWebClient()) json = wc.DownloadString(new Uri(safeurl));
                 contents = JsonConvert.DeserializeObject<GitHub_content[]>(json);
                 foreach (var cont in contents)
                 {
-                    if (cont.type == "file" && cont.name.EndsWith(".txt"))
-                    {
-                        safes.Add((cont.name, cont.download_url));
-                    }
+                    if (cont.type == "file" && cont.name.EndsWith(".txt")) safes.Add((cont.name, cont.download_url));
                 }
             }
             catch (WebException e)
@@ -514,17 +328,11 @@ namespace FACSSafeImport
             string unsafeurl = $"https://api.github.com/repos/{gitname}/contents/Unsafe%20Files";
             try
             {
-                using (MyWebClient wc = new MyWebClient())
-                {
-                    json = wc.DownloadString(new Uri(unsafeurl));
-                }
+                using (MyWebClient wc = new MyWebClient()) json = wc.DownloadString(new Uri(unsafeurl));
                 contents = JsonConvert.DeserializeObject<GitHub_content[]>(json);
                 foreach (var cont in contents)
                 {
-                    if (cont.type == "file" && cont.name.EndsWith(".txt"))
-                    {
-                        unsafes.Add((cont.name, cont.download_url));
-                    }
+                    if (cont.type == "file" && cont.name.EndsWith(".txt")) unsafes.Add((cont.name, cont.download_url));
                 }
             }
             catch (WebException e)
@@ -540,74 +348,94 @@ namespace FACSSafeImport
                 Debug.LogError($"An Exception occurred while processing Github page {gitname} (Unsafe Files).\n" + e.Message);
             }
 
-            int downloadCount = safes.Count + unsafes.Count;
+            return (gitname, safes, unsafes);
+        }
+
+        public static void DownloadGitHubContent((string, List<(string, string)>, List<(string, string)>) source, int maxDownloads, ref float maxDownloads_i)
+        {
+            string gitname = source.Item1; var safes = source.Item2; var unsafes = source.Item3;
             string safefolder = SafeImport.SafeImport_Safe + "/" + gitname.Replace("/", " ");
             string unsafefolder = SafeImport.SafeImport_Bad + "/" + gitname.Replace("/", " ");
             if (Directory.Exists(safefolder)) Directory.Delete(safefolder, true);
             if (Directory.Exists(unsafefolder)) Directory.Delete(unsafefolder, true);
-            if (!(downloadCount > 0))
-            {
-                Debug.LogWarning($"There were no Safe or Unsafe entries to download from the Github page {gitname}.\n");
-                return;
-            }
-
             Directory.CreateDirectory(safefolder);
             Directory.CreateDirectory(unsafefolder);
-            float index = 0;
-            foreach (var dd in safes)
+
+            for (int i = 0; i < safes.Count; i++)
             {
-                EditorUtility.DisplayProgressBar("FACS Safe Import - Downloading Online Databases", $"From {gitname}, Safe Hashes, {dd.Item1}", index / downloadCount);
+                var dd = safes[i];
+                EditorUtility.DisplayProgressBar("FACS Safe Import - Downloading Online Databases", $"From {gitname}, Safe Hashes ({i+1}/{safes.Count})", maxDownloads_i / maxDownloads);
                 try
                 {
-                    using (MyWebClient wc = new MyWebClient())
-                    {
-                        wc.DownloadFile(dd.Item2, safefolder + "/" + dd.Item1);
-                    }
+                    using (MyWebClient wc = new MyWebClient()) wc.DownloadFile(dd.Item2, safefolder + "/" + dd.Item1);
                 }
                 catch
                 {
                     Debug.LogError($"Failed to download Safe Hashes from GitHub {gitname}, {dd.Item1}\n");
                 }
-                index++;
+                maxDownloads_i++;
             }
-            foreach (var dd in unsafes)
+            for (int i = 0; i < unsafes.Count; i++)
             {
-                EditorUtility.DisplayProgressBar("FACS Safe Import - Downloading Online Databases", $"From {gitname}, Unsafe Hashes, {dd.Item1}", index / downloadCount);
+                var dd = unsafes[i];
+                EditorUtility.DisplayProgressBar("FACS Safe Import - Downloading Online Databases", $"From {gitname}, Unsafe Hashes ({i+1}/{unsafes.Count})", maxDownloads_i / maxDownloads);
                 try
                 {
-                    using (MyWebClient wc = new MyWebClient())
-                    {
-                        wc.DownloadFile(dd.Item2, unsafefolder + "/" + dd.Item1);
-                    }
+                    using (MyWebClient wc = new MyWebClient()) wc.DownloadFile(dd.Item2, unsafefolder + "/" + dd.Item1);
                 }
                 catch
                 {
                     Debug.LogError($"Failed to download Unsafe Hashes from GitHub {gitname}, {dd.Item1}\n");
                 }
-                index++;
+                maxDownloads_i++;
             }
+        }
+        public static void GetGitHubContent(List<string> onlinesources)
+        {
+            //gitname,safe(cont.name,cont.download_url),unsafe(cont.name,cont.download_url)
+            var todownload = new List<(string, List<(string, string)>, List<(string, string)>)>();
+            int downloadCount = 0;
+            foreach (var source in onlinesources)
+            {
+                var isValidGitHubSource = IsValidGitHubSource(source);
+                if (isValidGitHubSource == 3)
+                {
+                    var links = GetGitHubSafeUnsafeLinks(source);
+                    var linksN = links.Item2.Count + links.Item3.Count;
+                    if (linksN > 0)
+                    {
+                        downloadCount += linksN;
+                        todownload.Add(links);
+                    }
+                }
+            }
+            float index = 0;
+            foreach (var d in todownload) DownloadGitHubContent(d, downloadCount, ref index);
             EditorUtility.ClearProgressBar();
         }
-
+        public static void DownloadGitHubContent_Single(string gitname)
+        {
+            var links = GetGitHubSafeUnsafeLinks(gitname);
+            int downloadCount = links.Item2.Count + links.Item3.Count;
+            if (downloadCount == 0)
+            {
+                Debug.LogWarning($"There were no Safe or Unsafe entries to download from the Github page {gitname}.\n");
+                return;
+            }
+            float index = 0;
+            DownloadGitHubContent(links, downloadCount, ref index);
+            EditorUtility.ClearProgressBar();
+        }
         public static void LoadSources()
         {
             if (!File.Exists(Sources_file))
             {
-                using (StreamWriter sw = File.CreateText(OnlineSources.Sources_file))
-                {
-                    sw.WriteLine("FACS01-01/Safe_Import");
-                }
+                using (StreamWriter sw = File.CreateText(OnlineSources.Sources_file)) sw.WriteLine("FACS01-01/Safe_Import");
             }
             List<string> sources_list = new List<string>();
             var lines = File.ReadLines(Sources_file);
-            foreach (var line in lines)
-            {
-                sources_list.Add(line);
-            }
-            if (sources_list.Count > 0)
-            {
-                Sources = sources_list; Sources_Count = Sources.Count;
-            }
+            foreach (var line in lines) sources_list.Add(line);
+            if (sources_list.Count > 0) { Sources = sources_list; Sources_Count = Sources.Count; }
             else { Sources = null; Sources_Count = 0; }
         }
 
@@ -683,13 +511,11 @@ namespace FACSSafeImport
                 if (GUILayout.Button($"Download all Databases", FacsGUIStyles.button, GUILayout.Height(30)))
                 {
                     GetGitHubContent(Sources);
-                    EditorUtility.ClearProgressBar();
                     Debug.Log($"[<color=cyan>FACS Safe Import</color>] Finished downloading online databases!\n");
                     SafeImport.ReloadDatabase();
                 }
             }
         }
-
         public void OnDestroy()
         {
             Sources = null;
@@ -716,7 +542,6 @@ namespace FACSSafeImport
             var w = GetWindow(typeof(NewDatabaseEntry), false, "SafeImport - Add Safe", true);
             w.titleContent = new GUIContent("SafeImport - Add Safe");
         }
-
         [MenuItem("FACS Safe Import/Database/Add Unsafe Entry", false, 5)]
         public static void ShowWindow_NotAllowed()
         {
@@ -725,7 +550,6 @@ namespace FACSSafeImport
             var w = GetWindow(typeof(NewDatabaseEntry), false, "SafeImport - Add Unsafe", true);
             w.titleContent = new GUIContent("SafeImport - Add Unsafe");
         }
-
         public void OnGUI()
         {
             if (FacsGUIStyles == null) { FacsGUIStyles = new FACSGUIStyles(); }
@@ -787,7 +611,6 @@ namespace FACSSafeImport
                 GUILayout.FlexibleSpace();
             }
         }
-
         private void SelectAll(bool yesno)
         {
             if (selectedFilesB == null) return;
@@ -796,7 +619,6 @@ namespace FACSSafeImport
                 selectedFilesB[i] = yesno;
             }
         }
-
         private void WriteToFile(string filepath)
         {
             using (StreamWriter sw = File.AppendText(filepath))
@@ -828,7 +650,6 @@ namespace FACSSafeImport
                 }
             }
         }
-
         private void CreateNewEntry()
         {
             string FileName = newFileName + ".txt";
@@ -855,7 +676,6 @@ namespace FACSSafeImport
             Debug.Log($"[<color=cyan>FACS Safe Import</color>] Finished adding a new entry file to the database!\n");
             SafeImport.ReloadDatabase();
         }
-
         public static void OnDestroy()
         {
             newFileName = newFileHeader = selectedFolder = "";
@@ -952,7 +772,6 @@ namespace FACSSafeImport
                 Debug.Log($"[<color=cyan>FACS Safe Import</color>] There are no scripts in this project to scan.\n");
             }
         }
-
         public static void CheckSafeUnsafeFiles(List<string> importeds)
         {
             importeds.Sort();
