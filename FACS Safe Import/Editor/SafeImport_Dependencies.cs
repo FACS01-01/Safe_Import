@@ -1,5 +1,8 @@
-﻿using System.IO;
+#if UNITY_EDITOR
+using System.IO;
+using System.Linq;
 using UnityEditor;
+using UnityEditor.Compilation;
 using UnityEngine;
 
 
@@ -14,6 +17,18 @@ namespace FACS01_Dependencies
 
         static SafeImport_Dependencies()
         {
+            CompilationPipeline.assemblyCompilationFinished -= asmCompFinished;
+            CompilationPipeline.assemblyCompilationFinished += asmCompFinished;
+            Run();
+        }
+
+        static void asmCompFinished(string s, CompilerMessage[] compilerMessages)
+        {
+            if (compilerMessages.Count(m => m.type == CompilerMessageType.Error) > 0) Run();
+        }
+
+        static void Run()
+        {
             string datapath = Application.dataPath;
             string cscFile = datapath + "/csc.rsp";
             if (!File.Exists(cscFile))
@@ -26,18 +41,23 @@ namespace FACS01_Dependencies
             }
             else
             {
-                bool b1 = false; bool b2 = false;
+                bool b1 = false; bool b2 = false; bool endNewLine = false;
                 using (StreamReader sr = File.OpenText(cscFile))
                 {
-                    string s = ""; 
+                    string s = "";
                     while ((s = sr.ReadLine()) != null)
                     {
                         if (s.Contains(SysIOCompDLL)) b1 = true;
                         else if (s.Contains(SysIOCompFSDLL)) b2 = true;
+                        endNewLine = s.EndsWith("\n");
                     }
                 }
-                if (!b1) File.AppendAllText(cscFile, SysIOCompDLL + "\n");
-                if (!b2) File.AppendAllText(cscFile, SysIOCompFSDLL + "\n");
+                if (!b1 || !b2)
+                {
+                    if (!endNewLine) File.AppendAllText(cscFile, "\n");
+                    if (!b1) File.AppendAllText(cscFile, SysIOCompDLL + "\n");
+                    if (!b2) File.AppendAllText(cscFile, SysIOCompFSDLL + "\n");
+                }
             }
             UnlockScript();
         }
@@ -56,3 +76,4 @@ namespace FACS01_Dependencies
         }
     }
 }
+#endif
