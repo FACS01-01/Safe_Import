@@ -8,10 +8,5 @@ Unity script that protects you from running malicious scripts on import
 ## Donations
 If you like my tool and want to support me, I have a [Buy Me a Coffee](https://www.buymeacoffee.com/FACS01) page.
 
-## Thanks to / Using
-[icsharpcode/SharpZipLib](https://github.com/icsharpcode/SharpZipLib), used for zip file creation.
-
-[JamesNK/Newtonsoft.Json](https://github.com/JamesNK/Newtonsoft.Json), used for reading GitHub API in json.
-
 ## Featured Compatible Databases
 [Purple420/Hashes-of-Safe-Scripts](https://github.com/Purple420/Hashes-of-Safe-Scripts)
