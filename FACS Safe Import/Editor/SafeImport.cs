@@ -1,15 +1,17 @@
-﻿#if UNITY_EDITOR
-using ICSharpCode.SharpZipLib.Zip;
-using Newtonsoft.Json;
+
+// FACS01-01/Safe_Import v1.1
+#if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using System.Net;
 using System.Security.Cryptography;
 using UnityEditor;
 using UnityEditor.Compilation;
 using UnityEngine;
+using Unity.Plastic.Newtonsoft.Json;
 
 
 namespace FACSSafeImport
@@ -19,12 +21,12 @@ namespace FACSSafeImport
         [MenuItem("FACS Safe Import/Zip Unknown Scripts", false, 11)]
         public static void StartZip()
         {
-            string selectedFolder = Application.dataPath;
+            string selectedFolder = Application.dataPath.Replace(@"\", @"/");
             string[] CSPaths = Directory.GetFiles(selectedFolder, "*.cs", SearchOption.AllDirectories);
             string[] DLLPaths = Directory.GetFiles(selectedFolder, "*.dll", SearchOption.AllDirectories);
             if (CSPaths.Length != 0 || DLLPaths.Length != 0)
             {
-                string[] ScriptPaths = CSPaths.Concat(DLLPaths).ToArray();
+                string[] ScriptPaths = CSPaths.Concat(DLLPaths).Select(p=>p.Replace(@"\", @"/")).ToArray();
 
                 if (SafeImport.badFiles == null || SafeImport.safeFiles == null)
                 {
@@ -51,13 +53,19 @@ namespace FACSSafeImport
 
                     foreach (string file in unknownFiles)
                     {
-                        File.Copy(file, workFolder+"/"+ Path.GetFileName(file));
+                        string endfilepath = file.Replace(selectedFolder+"/","");
+                        string newfilepath = Path.Combine(workFolder, endfilepath).Replace(@"\", @"/");
+                        string newfolder = Path.GetDirectoryName(newfilepath);
+                        if (!Directory.Exists(newfolder)) Directory.CreateDirectory(newfolder);
+                        File.Copy(file, newfilepath);
                     }
 
-                    string zippath = resultsFolder + "/" + DateTime.Now.ToString("yyyy-MM-dd--HH-mm-ss") + ".zip";
-                    CompressDirectory(workFolder, zippath);
+                    string zippath = Path.GetTempFileName(); File.Delete(zippath);
+                    string zippath2 = resultsFolder + "/" + DateTime.Now.ToString("yyyy-MM-dd--HH-mm-ss") + ".zip";
+                    CompressDirectory(workFolder+"/", zippath);
                     Directory.Delete(workFolder, true);
-                    EditorUtility.RevealInFinder(zippath);
+                    File.Move(zippath, zippath2);
+                    EditorUtility.RevealInFinder(zippath2);
                 }
                 else
                 {
@@ -69,39 +77,16 @@ namespace FACSSafeImport
                 Debug.LogWarning($"[<color=cyan>FACS Safe Import</color>] There are no scripts to zip in this project.\n");
             }
         }
-        private static void CompressDirectory(string DirectoryPath, string OutputFilePath, int CompressionLevel = 9)
+
+        private static void CompressDirectory(string DirectoryPath, string OutputFilePath)
         {
             try
             {
-                string[] filenames = Directory.GetFiles(DirectoryPath);
-                using (ZipOutputStream OutputStream = new ZipOutputStream(File.Create(OutputFilePath)))
-                {
-                    OutputStream.SetLevel(CompressionLevel);
-
-                    byte[] buffer = new byte[4096];
-
-                    foreach (string file in filenames)
-                    {
-                        ZipEntry entry = new ZipEntry(Path.GetFileName(file));
-                        entry.DateTime = DateTime.Now;
-                        OutputStream.PutNextEntry(entry);
-                        using (FileStream fs = File.OpenRead(file))
-                        {
-                            int sourceBytes;
-                            do
-                            {
-                                sourceBytes = fs.Read(buffer, 0, buffer.Length);
-                                OutputStream.Write(buffer, 0, sourceBytes);
-                            } while (sourceBytes > 0);
-                        }
-                    }
-                    OutputStream.Finish();
-                    OutputStream.Close();
-                }
+                ZipFile.CreateFromDirectory(DirectoryPath, OutputFilePath, System.IO.Compression.CompressionLevel.Optimal, false);
             }
             catch (Exception ex)
             {
-                Debug.LogError($"Exception during processing\n{ex.Message}");
+                Debug.LogError($"[<color=cyan>FACS Safe Import</color>] Exception while zipping unknown scripts.\n{ex.Message}");
             }
         }
     }
@@ -128,6 +113,7 @@ namespace FACSSafeImport
                 AssetDatabase.Refresh();
             }
         }
+
         public static void DownloadOnlineSourcesOnStartup()
         {
             if (!Directory.Exists(SafeImport.MainFolder))
@@ -230,6 +216,7 @@ namespace FACSSafeImport
             }
             Debug.Log($"[<color=cyan>FACS Safe Import</color>] Reloading scripts...\n");
         }
+
         public static void OnAfterAssemblyReload()
         {
             AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
@@ -277,7 +264,7 @@ namespace FACSSafeImport
             }
             badFiles = unsafepathslist.ToArray();
 
-            Debug.Log($"[<color=cyan>FACS Safe Import</color>] Database loaded with {safeFiles.Length} allowed hashes and {badFiles.Length} not allowed hashes.\n");
+            Debug.Log($"[<color=cyan>FACS Safe Import</color>] Database loaded with {safeFiles.Length} safe hashes and {badFiles.Length} unsafe hashes.\n");
         }
 
         [MenuItem("FACS Safe Import/Database/Open Database Folder", false, 3)]
@@ -321,6 +308,7 @@ namespace FACSSafeImport
             if (newsource == null) newsource = "{user}/{repo}";
             GetWindow(typeof(OnlineSources), false, "Safe Import Sources", true);
         }
+
         public static int IsValidGitHubSource(string gitname)
         {
             string url = "https://api.github.com/repos/" + gitname + "/contents";
@@ -360,6 +348,7 @@ namespace FACSSafeImport
             }
             return output;
         }
+
         public static void GetGitHubContent(List<string> onlinesources)
         {
             int sourcescount = onlinesources.Count;
@@ -463,7 +452,7 @@ namespace FACSSafeImport
                     }
                     catch
                     {
-                        Debug.LogError($"Failed to download Allowed Hashes from GitHub {gitname}, {dd.Item1}\n");
+                        Debug.LogError($"Failed to download Safe Hashes from GitHub {gitname}, {dd.Item1}\n");
                     }
                     index++;
                 }
@@ -479,12 +468,13 @@ namespace FACSSafeImport
                     }
                     catch
                     {
-                        Debug.LogError($"Failed to download Not Allowed Hashes from GitHub {gitname}, {dd.Item1}\n");
+                        Debug.LogError($"Failed to download Unsafe Hashes from GitHub {gitname}, {dd.Item1}\n");
                     }
                     index++;
                 }
             }
         }
+
         public static void DownloadGitHubContent_Single(string gitname)
         {
             //safe(cont.name,cont.download_url)
@@ -576,7 +566,7 @@ namespace FACSSafeImport
                 }
                 catch
                 {
-                    Debug.LogError($"Failed to download Allowed Hashes from GitHub {gitname}, {dd.Item1}\n");
+                    Debug.LogError($"Failed to download Safe Hashes from GitHub {gitname}, {dd.Item1}\n");
                 }
                 index++;
             }
@@ -592,12 +582,13 @@ namespace FACSSafeImport
                 }
                 catch
                 {
-                    Debug.LogError($"Failed to download Not Allowed Hashes from GitHub {gitname}, {dd.Item1}\n");
+                    Debug.LogError($"Failed to download Unsafe Hashes from GitHub {gitname}, {dd.Item1}\n");
                 }
                 index++;
             }
             EditorUtility.ClearProgressBar();
         }
+
         public static void LoadSources()
         {
             if (!File.Exists(Sources_file))
@@ -698,6 +689,7 @@ namespace FACSSafeImport
                 }
             }
         }
+
         public void OnDestroy()
         {
             Sources = null;
@@ -724,6 +716,7 @@ namespace FACSSafeImport
             var w = GetWindow(typeof(NewDatabaseEntry), false, "SafeImport - Add Safe", true);
             w.titleContent = new GUIContent("SafeImport - Add Safe");
         }
+
         [MenuItem("FACS Safe Import/Database/Add Unsafe Entry", false, 5)]
         public static void ShowWindow_NotAllowed()
         {
@@ -732,12 +725,13 @@ namespace FACSSafeImport
             var w = GetWindow(typeof(NewDatabaseEntry), false, "SafeImport - Add Unsafe", true);
             w.titleContent = new GUIContent("SafeImport - Add Unsafe");
         }
+
         public void OnGUI()
         {
             if (FacsGUIStyles == null) { FacsGUIStyles = new FACSGUIStyles(); }
             FacsGUIStyles.helpbox.alignment = TextAnchor.MiddleCenter;
 
-            EditorGUILayout.LabelField($"You are about to create a new {(safeEntry ? "" : "Not ")}Allowed entry for your personal database.", FacsGUIStyles.helpbox);
+            EditorGUILayout.LabelField($"You are about to create a new {(safeEntry ? "" : "Not ")}Safe entry for your personal database.", FacsGUIStyles.helpbox);
             newFileName = EditorGUILayout.TextField("File name: ", newFileName);
             newFileHeader = EditorGUILayout.TextField("Header: ", newFileHeader);
 
@@ -793,6 +787,7 @@ namespace FACSSafeImport
                 GUILayout.FlexibleSpace();
             }
         }
+
         private void SelectAll(bool yesno)
         {
             if (selectedFilesB == null) return;
@@ -801,6 +796,7 @@ namespace FACSSafeImport
                 selectedFilesB[i] = yesno;
             }
         }
+
         private void WriteToFile(string filepath)
         {
             using (StreamWriter sw = File.AppendText(filepath))
@@ -832,6 +828,7 @@ namespace FACSSafeImport
                 }
             }
         }
+
         private void CreateNewEntry()
         {
             string FileName = newFileName + ".txt";
@@ -858,6 +855,7 @@ namespace FACSSafeImport
             Debug.Log($"[<color=cyan>FACS Safe Import</color>] Finished adding a new entry file to the database!\n");
             SafeImport.ReloadDatabase();
         }
+
         public static void OnDestroy()
         {
             newFileName = newFileHeader = selectedFolder = "";
@@ -954,6 +952,7 @@ namespace FACSSafeImport
                 Debug.Log($"[<color=cyan>FACS Safe Import</color>] There are no scripts in this project to scan.\n");
             }
         }
+
         public static void CheckSafeUnsafeFiles(List<string> importeds)
         {
             importeds.Sort();
@@ -982,7 +981,7 @@ namespace FACSSafeImport
                 {
                     output += f.Item1 + " | Hash: " + f.Item2 + "\n";
                 }
-                Debug.Log($"[<color=cyan>FACS Safe Import</color>] Allowed scripts ({safeFiles.Count}):\n" + output);
+                Debug.Log($"[<color=cyan>FACS Safe Import</color>] Safe scripts ({safeFiles.Count}):\n" + output);
             }
 
             if (unknownFiles.Count > 0)
@@ -1007,7 +1006,7 @@ namespace FACSSafeImport
                         File.Delete(f.Item1 + ".meta");
                     }
                 }
-                Debug.LogError($"[<color=cyan>FACS Safe Import</color>] Not allowed scripts ({badFilesShouldDelete.Count}). They will be deleted:\n" + output);
+                Debug.LogError($"[<color=cyan>FACS Safe Import</color>] Unsafe scripts ({badFilesShouldDelete.Count}). They will be deleted:\n" + output);
             }
         }
     }
@@ -1082,3 +1081,4 @@ namespace FACSSafeImport
     }
 }
 #endif
+
